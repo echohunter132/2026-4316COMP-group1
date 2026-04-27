@@ -27,7 +27,7 @@ def getHighestDay():
     return max_date, max_cases
 
 def getTop10RatioChart():
-    overall = data.groupby('Countr7y/Region')[['Confirmed', 'Deaths']].sum()
+    overall = data.groupby('Country/Region')[['Confirmed', 'Deaths']].sum()
     overall['Ratio'] = overall['Deaths'] / overall['Confirmed'].replace(0, 1)
     top10 = overall.sort_values('Ratio', ascending=False).head(10)
 
@@ -177,6 +177,134 @@ def plot_recovery_rate():
     plt.tight_layout()
     plt.show()
 
+def fastest_decline_after_peak():
+    active_trend = data.groupby(["Country/Region", "Date"])["Active"].sum().reset_index()
+
+    def decline_rate(group):
+        group = group.sort_values("Date")
+        peak = group["Active"].max()
+        peak_position = group["Active"].idxmax()
+        after_peak = group.loc[peak_position:]
+
+        if len(after_peak) > 1:
+            return (after_peak.iloc[-1]["Active"] - peak) / len(after_peak)
+        return 0
+
+    declines = active_trend.groupby("Country/Region").apply(decline_rate)
+    top5 = declines.sort_values().head(5)
+
+    print("Countries that reduced active cases fastest after peak:")
+    print(top5)
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.barh(top5.index, top5.values)
+
+    ax.set(
+        title="Top 5 Countries with Fastest Active Case Decline After Peak",
+        xlabel="Average Daily Decline After Peak",
+        ylabel="Country"
+    )
+
+    ax.grid(True, axis="x", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.show()
+
+def find_anomalies():
+    df_sorted = data.sort_values(["Country/Region", "Date"]).copy()
+
+    df_sorted["Confirmed Change"] = df_sorted.groupby("Country/Region")["Confirmed"].diff()
+    df_sorted["Deaths Change"] = df_sorted.groupby("Country/Region")["Deaths"].diff()
+
+    anomalies = df_sorted[
+        (df_sorted["Deaths Change"] > 0) & (df_sorted["Confirmed Change"] <= 0)
+    ]
+
+    anomaly_counts = anomalies["Country/Region"].value_counts().head(10)
+
+    print("Countries with unusual reporting patterns:")
+    print(anomaly_counts)
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.barh(anomaly_counts.index, anomaly_counts.values)
+
+    ax.set(
+        title="Top 10 Countries with Death Increases but No Confirmed Case Increase",
+        xlabel="Number of Anomaly Days",
+        ylabel="Country"
+    )
+
+    ax.grid(True, axis="x", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.show()    
+
+def fastest_region_to_100k():
+    region_daily = data.groupby(["WHO Region", "Date"])["Confirmed"].sum().reset_index()
+
+    def time_to_threshold(group, threshold=100000):
+        group = group.sort_values("Date")
+        reached = group[group["Confirmed"] >= threshold]
+
+        if not reached.empty:
+            return (reached.iloc[0]["Date"] - group.iloc[0]["Date"]).days
+        return np.nan
+
+    threshold_times = region_daily.groupby("WHO Region").apply(time_to_threshold)
+    threshold_times = threshold_times.dropna().sort_values()
+
+    print("Fastest WHO regions to reach 100,000 confirmed cases:")
+    print(threshold_times)
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.barh(threshold_times.index, threshold_times.values)
+
+    ax.set(
+        title="Days Taken for WHO Regions to Reach 100,000 Confirmed Cases",
+        xlabel="Days Taken",
+        ylabel="WHO Region"
+    )
+
+    ax.grid(True, axis="x", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.show()
+
+def longest_decline_streak():
+    df_sorted = data.sort_values(["Country/Region", "Date"]).copy()
+
+    def longest_decline(group):
+        decline_streak = 0
+        max_streak = 0
+
+        changes = group["Active"].diff()
+
+        for change in changes:
+            if change < 0:
+                decline_streak += 1
+                max_streak = max(max_streak, decline_streak)
+            else:
+                decline_streak = 0
+
+        return max_streak
+
+    decline_streaks = df_sorted.groupby("Country/Region").apply(longest_decline)
+    top5 = decline_streaks.sort_values(ascending=False).head(5)
+
+    print("Countries with the longest sustained decrease in active cases:")
+    print(top5)
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.barh(top5.index, top5.values)
+
+    ax.set(
+        title="Top 5 Countries with Longest Sustained Decline in Active Cases",
+        xlabel="Longest Consecutive Decline Streak (Days)",
+        ylabel="Country"
+    )
+
+    ax.grid(True, axis="x", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.show()    
+
+
 while True:
     print("\nMenu:")
     print("1. Find country with most deaths in a specific month")
@@ -189,9 +317,13 @@ while True:
     print("8. View top 5 countries with fastest growth")
     print("9. View first recorded case by country")
     print("10. View top 5 countries by recovery rate")
-    print("11. Exit")
+    print("11. Countries with fastest decline after peak")
+    print("12. Detect unusual reporting patterns")
+    print("13. Fastest region to 100k cases")
+    print("14. Longest decline streak")
+    print("15. Exit")
 
-    choice = input("Enter your choice (1-11): ").strip()
+    choice = input("Enter your choice (1-15): ").strip()
 
     if choice == '1':
         month_input = input("Enter a month (1-12 or month name e.g. January): ").strip()
@@ -245,8 +377,20 @@ while True:
         plot_recovery_rate()
 
     elif choice == '11':
+        fastest_decline_after_peak()
+
+    elif choice == '12':
+        find_anomalies()
+
+    elif choice == '13':
+        fastest_region_to_100k()
+
+    elif choice == '14':
+        longest_decline_streak()
+
+    elif choice == '15':
         print("Exiting...")
         break
 
     else:
-        print("Invalid choice. Please enter 1-11.")
+        print("Invalid choice. Please enter 1-15.")
