@@ -1,0 +1,30 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+df = pd.read_csv("country_wise_latest.csv")
+
+df["Recovered"] = pd.to_numeric(df["Recovered"], errors="coerce")
+df["Confirmed"] = pd.to_numeric(df["Confirmed"], errors="coerce")
+
+df["Recovery Rate"] = df["Recovered"] / df["Confirmed"]
+
+df = df.dropna(subset=["Recovery Rate"])
+
+top5 = df.sort_values(by="Recovery Rate", ascending=False).head(5)
+
+plt.figure(figsize=(10,6))
+
+sns.barplot(
+    data=top5,
+    x="Recovery Rate",
+    y="Country/Region",
+    palette="Greens_r"
+)
+
+plt.title("Top 5 Countries by Recovery Rate")
+plt.xlabel("Recovery Rate")
+plt.ylabel("Country")
+
+plt.tight_layout()
+plt.show()

@@ -1,0 +1,26 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+df = pd.read_csv("full_grouped.csv")
+df["Date"] = pd.to_datetime(df["Date"])
+
+
+df = df[df["Confirmed"] > 0]
+first_cases = df.groupby("Country/Region")["Date"].min().reset_index()
+first_cases = first_cases.sort_values("Date")
+first_cases["Country Index"] = range(len(first_cases))
+
+plt.figure(figsize=(12,6))
+
+plt.scatter(
+    first_cases["Date"],
+    first_cases["Country Index"],
+    alpha=0.7
+)
+
+plt.title("First COVID-19 Case by Country")
+plt.xlabel("Date of First Case")
+plt.ylabel("Countries (indexed)")
+
+plt.tight_layout()
+plt.show()
